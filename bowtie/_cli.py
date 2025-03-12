@@ -88,6 +88,7 @@ class _EX:
 
 EX = _EX()
 
+STDOUT = console.Console()
 STDERR = console.Console(stderr=True)
 
 STARTUP_ERRORS = (CannotConnect, NoSuchImplementation, StartupFailed)
@@ -676,10 +677,10 @@ def summary(report: _report.Report, format: _F, show: str):
             click.echo(json.dumps(to_serializable(results), indent=2))  # type: ignore[reportGeneralTypeIssues]
         case "pretty":
             table = to_table(report, results)  # type: ignore[reportGeneralTypeIssues]
-            console.Console().print(table)
+            STDOUT.print(table)
         case "markdown":
             table = to_markdown_table(report, results)  # type: ignore[reportGeneralTypeIssues]
-            console.Console().print(table)
+            STDOUT.print(table)
 
     return exit_code
 
@@ -1489,7 +1490,7 @@ def filter_benchmarks(
         dialect=dialect,
     )
     for file in files:
-        console.Console().file.write(f"{file}\n")
+        STDOUT.file.write(f"{file}\n")
 
 
 LANGUAGE_ALIASES = {
@@ -1660,6 +1661,62 @@ def latest_report(dialect: Dialect):
     asyncio.run(write(dialect.latest_report()))
 
 
+def _info_links_table_for(metadata: dict[str, Any]):
+    table = Table(
+        Column(style="spring_green4"),
+        box=None,
+        padding=(0, 1, 0, 0),
+        show_header=False,
+    )
+
+    table.add_row("homepage", metadata["homepage"])
+    table.add_row("source", metadata["source"])
+    table.add_row("issues", metadata["issues"])
+
+    if "documentation" in metadata:
+        table.add_row("documentation", metadata["documentation"])
+
+    for link in metadata.get("links", []):
+        table.add_row(link["description"], link["url"])
+
+    return table
+
+
+def _info_table_for(metadata: dict[str, Any]):
+    table = Table(
+        Column(style="cyan bold"),
+        box=box.ROUNDED,
+        show_header=False,
+        border_style="bright_black",
+    )
+
+    table.add_row(
+        "implementation",
+        f"{metadata["name"]} [grey58]{metadata.get("version", "")}[/grey58]",
+    )
+    table.add_row(
+        "language",
+        f"{metadata["language"]} [grey58]{metadata.get("language_version", "")}[/grey58]",  # noqa: E501
+    )
+    table.add_row(
+        "dialects",
+        "\n".join(
+            Dialect.from_str(dialect).pretty_name
+            for dialect in cast(list[str], metadata.get("dialects"))
+        ),
+        end_section=True,
+    )
+    table.add_row("links", _info_links_table_for(metadata))
+
+    if "os" in metadata:
+        table.caption = Text(
+            f"Ran on {metadata["os"]} {metadata.get("os_version", "")}",
+            style="bright_black",
+        )
+
+    return table
+
+
 @implementation_subcommand()  # type: ignore[reportArgumentType]
 @format_option()
 @click.option(
@@ -1698,11 +1755,8 @@ async def info(
             case "json":
                 serializable[each.id] = dict(metadata)
             case "pretty":
-                click.echo(
-                    "\n".join(
-                        f"{k}: {json.dumps(v, indent=2)}" for k, v in metadata
-                    ),
-                )
+                table = _info_table_for(dict(metadata))
+                STDOUT.print(table, "\n")
             case "markdown":
                 click.echo(
                     "\n".join(
@@ -1731,7 +1785,7 @@ async def download_versions_of(id: ConnectableId) -> frozenset[str]:
         DownloadColumn(),
         "•",
         TimeElapsedColumn(),
-        console=console.Console(),
+        console=STDOUT,
         transient=True,
     )
     task = progress.add_task(
@@ -1791,7 +1845,7 @@ async def download_and_parse_reports_for(
         MofNCompleteColumn(),
         "•",
         TimeElapsedColumn(),
-        console=console.Console(),
+        console=STDOUT,
         transient=True,
     )
 
@@ -2107,7 +2161,7 @@ class _VersionedReportsTar(click.File):
                     MofNCompleteColumn(),
                     "•",
                     TimeElapsedColumn(),
-                    console=console.Console(),
+                    console=STDOUT,
                     transient=True,
                 )
                 dialects = (
@@ -2332,11 +2386,11 @@ def trend(
             ]
             click.echo(json.dumps(serializable, indent=2))
         case "pretty":
-            console.Console().print(
+            STDOUT.print(
                 _trend_table_for(id, versions, dialects_trend),
             )
         case "markdown":
-            console.Console().print(
+            STDOUT.print(
                 _trend_table_in_markdown_for(id, versions, dialects_trend),
             )
 
@@ -2370,11 +2424,10 @@ async def smoke(start: Starter, format: _F, echo: Callable[..., None]) -> int:
             output = {id: result.serializable() for id, _, result in results}
             echo(json.dumps(output, indent=2))
         case [(_, _, result)], "pretty":
-            console.Console().print(result)
+            STDOUT.print(result)
         case _, "pretty":
-            out = console.Console()
             for _, _, each in results:
-                out.print(each)
+                STDOUT.print(each)
         case _, "markdown":
             for _, info, result in results:
                 echo(f"# {info.name} ({info.language})\n")
