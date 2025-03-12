@@ -40,7 +40,7 @@ int main() {
                                   std::to_string(JSONCONS_VERSION_MINOR) + "." +
                                   std::to_string(JSONCONS_VERSION_PATCH);
       implementation["name"] = "jsoncons";
-      implementation["homepage"] = "https://danielaparker.github.io/jsoncons/";
+      implementation["homepage"] = "https://github.com/danielaparker/jsoncons/blob/master/doc/ref/jsonschema/jsonschema.md";
       implementation["issues"] =
           "https://github.com/danielaparker/jsoncons/issues";
       implementation["source"] = "https://github.com/danielaparker/jsoncons";
